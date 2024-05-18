@@ -34,7 +34,7 @@ jobs:
           path: >
             ${{ steps.build.outputs.target }}
           name: compose-edit-${{ github.ref_name }}.${{ matrix.os }}-${{ matrix.arch }}
-          format: tgz
+          format: tar.gz
   upload:
     needs: release
     permissions:
