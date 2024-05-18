@@ -1,0 +1,11 @@
+version: '3'
+tasks:
+  default:
+    deps:
+      - task: build
+  build:
+    cmds:
+      - go mod tidy
+      - rm -rf ./bin
+      - mkdir -p ./bin
+      - go build -o ./bin ./cmd/...
