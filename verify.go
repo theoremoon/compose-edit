@@ -1,9 +1,9 @@
 package composeedit
 
 import (
-	composelib "github.com/compose-spec/compose-go/types"
+	composecli "github.com/compose-spec/compose-go/v2/cli"
+	composelib "github.com/compose-spec/compose-go/v2/types"
 	"github.com/pkg/errors"
-	compose "github.com/theoremoon/compose-edit/compose"
 	cli "github.com/urfave/cli/v2"
 )
 
@@ -11,18 +11,18 @@ func verifyCommand() *cli.Command {
 	return &cli.Command{
 		Name: "verify",
 		Action: func(c *cli.Context) error {
-			composeFile := c.Args().Get(0)
-			if composeFile == "" {
-				return errors.New("argument missing: compose file")
-			}
-			config, err := compose.LoadFromFile(composeFile)
+			o, err := composecli.NewProjectOptions([]string{}, composecli.WithDefaultConfigPath)
 			if err != nil {
 				return err
 			}
-			err = ValidateComposeConfig(config)
+			p, err := o.LoadProject(c.Context)
 			if err != nil {
 				return err
 			}
+			if err := ValidateComposeConfig(p); err != nil {
+				return err
+			}
+
 			return nil
 		},
 	}
@@ -45,7 +45,7 @@ func ValidateComposeConfig(conf *composelib.Project) error {
 		if svc.Deploy != nil {
 			return errors.New("deploy is prohibited")
 		}
-		if len(svc.EnvFile) != 0 {
+		if len(svc.EnvFiles) != 0 {
 			return errors.New("envfile is prohibited")
 		}
 		if svc.Logging != nil {

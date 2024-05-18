@@ -2,9 +2,10 @@ package composeedit
 
 import (
 	"fmt"
+	"os"
 
+	composecli "github.com/compose-spec/compose-go/v2/cli"
 	"github.com/pkg/errors"
-	"github.com/theoremoon/compose-edit/compose"
 	cli "github.com/urfave/cli/v2"
 )
 
@@ -15,41 +16,54 @@ func setImageCommand() *cli.Command {
 			&cli.StringFlag{
 				Name: "image-prefix",
 			},
+			&cli.BoolFlag{
+				Name:  "i",
+				Value: false,
+			},
 		},
 		Action: func(c *cli.Context) error {
-			composeFile := c.Args().Get(0)
-			if composeFile == "" {
-				return errors.New("argument missing: compose file")
+			o, err := composecli.NewProjectOptions([]string{}, composecli.WithDefaultConfigPath)
+			if err != nil {
+				return err
+			}
+			p, err := o.LoadProject(c.Context)
+			if err != nil {
+				return err
 			}
 			prefix := c.String("image-prefix")
 			if prefix == "" {
 				return errors.New("flag missing: image-prefix")
 			}
 
-			var err error
 			prefix, err = normalizeImagePrefix(prefix)
 			if err != nil {
 				return err
 			}
 
-			config, err := compose.LoadFromFile(composeFile)
-			if err != nil {
-				return err
-			}
-
 			// プロパティを上書きしたいのでindexアクセスする
-			for i, _ := range config.Services {
-				if config.Services[i].Image != "" {
+			for i, _ := range p.Services {
+				if p.Services[i].Image != "" {
 					continue
 				}
-				config.Services[i].Image = prefix + config.Services[i].Name
+				// avoid Unaddressable Field Assign
+				svc := p.Services[i]
+				svc.Image = prefix + svc.Name
+				p.Services[i] = svc
 			}
 
-			yaml, err := config.MarshalYAML()
+			yaml, err := p.MarshalYAML()
 			if err != nil {
 				return err
 			}
-			fmt.Println(string(yaml))
+			if c.Bool("i") {
+				f := p.ComposeFiles[0]
+				err = os.WriteFile(f, yaml, 0644)
+				if err != nil {
+					return err
+				}
+			} else {
+				fmt.Println(string(yaml))
+			}
 
 			return nil
 		},
