@@ -1,0 +1,52 @@
+name: Release
+
+on:
+  release:
+    types:
+    - published
+jobs:
+  release:
+    strategy:
+      matrix:
+        os:
+          - linux
+        arch:
+          - amd64
+          - arm64
+    runs-on: ubuntu-latest
+    steps:
+     - uses: actions/setup-go@v5
+       with:
+         go-version: stable
+     - id: build
+       uses: lufia/workflows/.github/actions/go-install@v0.4.0
+       with:
+         package-path: github.com/theoremoon/compose-edit/cmd/compose-edit
+         version: ${{ github.ref_name }}
+       env:
+         GOOS: ${{ matrix.os }}
+         GOARCH: ${{ matrix.arch }}
+         CGO_ENABLED: 0
+    - name: Create the asset consists of the build artifacts
+      uses: lufia/workflows/.github/actions/upload-asset@v0.4.0
+      with:
+        tag: ${{ github.ref_name }}
+        path: >
+          ${{ steps.build.outputs.target }}
+        name: compose-edit-${{ github.ref_name }}.${{ matrix.os }}-${{ matrix.arch }}
+        format: tgz
+
+  upload:
+    needs: release
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/download-artifact@v4
+      with:
+        path: assets
+        merge-multiple: true
+    - name: Upload the assets to the release
+      run: gh release upload -R "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME" assets/*
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
