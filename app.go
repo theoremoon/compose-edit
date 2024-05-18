@@ -10,6 +10,7 @@ func App() *cli.App {
 		Commands: []*cli.Command{
 			verifyCommand(),
 			setImageCommand(),
+			listImagesCommand(),
 		},
 	}
 }

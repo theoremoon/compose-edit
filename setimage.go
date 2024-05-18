@@ -3,6 +3,7 @@ package composeedit
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	composecli "github.com/compose-spec/compose-go/v2/cli"
 	"github.com/pkg/errors"
@@ -14,7 +15,7 @@ func setImageCommand() *cli.Command {
 		Name: "set-image",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name: "image-prefix",
+				Name: "format",
 			},
 			&cli.BoolFlag{
 				Name:  "i",
@@ -30,14 +31,9 @@ func setImageCommand() *cli.Command {
 			if err != nil {
 				return err
 			}
-			prefix := c.String("image-prefix")
-			if prefix == "" {
-				return errors.New("flag missing: image-prefix")
-			}
-
-			prefix, err = normalizeImagePrefix(prefix)
-			if err != nil {
-				return err
+			format := c.String("format")
+			if format == "" {
+				return errors.New("flag missing: image-format")
 			}
 
 			// プロパティを上書きしたいのでindexアクセスする
@@ -47,7 +43,7 @@ func setImageCommand() *cli.Command {
 				}
 				// avoid Unaddressable Field Assign
 				svc := p.Services[i]
-				svc.Image = prefix + svc.Name
+				svc.Image = strings.Replace(format, "{Name}", svc.Name, -1)
 				p.Services[i] = svc
 			}
 
@@ -68,14 +64,4 @@ func setImageCommand() *cli.Command {
 			return nil
 		},
 	}
-}
-
-func normalizeImagePrefix(prefix string) (string, error) {
-	if prefix == "" {
-		return "", errors.New("image prefix is empty")
-	}
-	if prefix[len(prefix)-1] != '/' {
-		return prefix + "/", nil
-	}
-	return prefix, nil
 }
