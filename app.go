@@ -18,6 +18,7 @@ func App() *cli.App {
 			catCommand(loadComposeProject),
 			listImagesCommand(loadComposeProject),
 			setImageCommand(loadComposeProject),
+			taskifyCommand(loadComposeProject),
 			verifyCommand(loadComposeProject),
 		},
 	}
