@@ -49,6 +49,9 @@ func ValidateComposeConfig(conf *composelib.Project) error {
 		if svc.OomKillDisable {
 			return errors.New("oom_kill_disable is prohibited")
 		}
+		if len(svc.Links) != 0 {
+			return errors.New("links is prohibited")
+		}
 		if svc.Privileged {
 			return errors.New("privileged is prohibited")
 		}
