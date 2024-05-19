@@ -2,7 +2,9 @@ package composeedit
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
@@ -11,6 +13,11 @@ import (
 	"github.com/pkg/errors"
 	cli "github.com/urfave/cli/v2"
 )
+
+type cacheRepoConfig struct {
+	Upstream string
+	Repo     string
+}
 
 func taskifyCommand(loadCompose loadComposeFunc) *cli.Command {
 	return &cli.Command{
@@ -21,6 +28,9 @@ func taskifyCommand(loadCompose loadComposeFunc) *cli.Command {
 			},
 			&cli.StringFlag{
 				Name: "execution-role",
+			},
+			&cli.StringSliceFlag{
+				Name: "cache-repo",
 			},
 		},
 		Action: func(c *cli.Context) error {
@@ -36,8 +46,9 @@ func taskifyCommand(loadCompose loadComposeFunc) *cli.Command {
 			if executionRole == "" {
 				return errors.New("execution-role is required")
 			}
+			cacheRepos := parseCacheRepos(c.StringSlice("cache-repo"))
 
-			td, _, err := taskify(p, family, executionRole)
+			td, _, err := taskify(p, family, executionRole, cacheRepos)
 			if err != nil {
 				return err
 			}
@@ -53,10 +64,10 @@ func taskifyCommand(loadCompose loadComposeFunc) *cli.Command {
 	}
 }
 
-func taskify(p *composelib.Project, family, executionRole string) (*ecs.RegisterTaskDefinitionInput, *ecs.CreateServiceInput, error) {
+func taskify(p *composelib.Project, family, executionRole string, cacheRepos []cacheRepoConfig) (*ecs.RegisterTaskDefinitionInput, *ecs.CreateServiceInput, error) {
 	cdefs := make([]types.ContainerDefinition, 0)
 	for _, svc := range p.Services {
-		cdef, err := toContainerDefinition(&svc)
+		cdef, err := toContainerDefinition(&svc, cacheRepos)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -77,7 +88,7 @@ func taskify(p *composelib.Project, family, executionRole string) (*ecs.Register
 	return td, nil, nil
 }
 
-func toContainerDefinition(svc *composelib.ServiceConfig) (*types.ContainerDefinition, error) {
+func toContainerDefinition(svc *composelib.ServiceConfig, cacheRepos []cacheRepoConfig) (*types.ContainerDefinition, error) {
 	envs := make([]types.KeyValuePair, 0)
 	for k, v := range svc.Environment {
 		envs = append(envs, types.KeyValuePair{
@@ -118,7 +129,7 @@ func toContainerDefinition(svc *composelib.ServiceConfig) (*types.ContainerDefin
 
 	cdef := types.ContainerDefinition{
 		Name:         &svc.Name,
-		Image:        &svc.Image,
+		Image:        aws.String(imageThroughCache(svc.Image, cacheRepos)),
 		Command:      svc.Command,
 		EntryPoint:   svc.Entrypoint,
 		Environment:  envs,
@@ -140,4 +151,46 @@ func convertCondition(c string) (types.ContainerCondition, error) {
 	default:
 		return "", errors.New("unknown condition: " + c)
 	}
+}
+
+func parseCacheRepos(cacheRepos []string) []cacheRepoConfig {
+	crs := make([]cacheRepoConfig, 0)
+	pat := regexp.MustCompile(`^([^#]+)#(.+)$`)
+	for _, cr := range cacheRepos {
+		if pat.MatchString(cr) {
+			matches := pat.FindStringSubmatch(cr)
+			crs = append(crs, cacheRepoConfig{
+				Upstream: matches[1],
+				Repo:     matches[2],
+			})
+		} else {
+			// docker hub
+			crs = append(crs, cacheRepoConfig{
+				Upstream: "",
+				Repo:     cr,
+			})
+		}
+	}
+	return crs
+}
+
+func imageThroughCache(image string, cacheRepos []cacheRepoConfig) string {
+	for _, cr := range cacheRepos {
+		if cr.Upstream == "" {
+			// docker.io/owner/image format
+			if strings.HasPrefix(image, "docker.io/") {
+				return strings.Replace(image, "docker.io/", cr.Repo+"/", 1)
+			}
+
+			// owner/image or image format
+			if len(strings.Split(image, "/")) <= 2 {
+				return cr.Repo + "/" + image
+			}
+		} else {
+			if strings.HasPrefix(image, cr.Upstream) {
+				return strings.Replace(image, cr.Upstream, cr.Repo, 1)
+			}
+		}
+	}
+	return image
 }
