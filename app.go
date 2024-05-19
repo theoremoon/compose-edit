@@ -15,9 +15,10 @@ func App() *cli.App {
 			},
 		},
 		Commands: []*cli.Command{
-			verifyCommand(loadComposeProject),
-			setImageCommand(loadComposeProject),
+			catCommand(loadComposeProject),
 			listImagesCommand(loadComposeProject),
+			setImageCommand(loadComposeProject),
+			verifyCommand(loadComposeProject),
 		},
 	}
 }
