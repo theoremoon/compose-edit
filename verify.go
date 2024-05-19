@@ -1,21 +1,16 @@
 package composeedit
 
 import (
-	composecli "github.com/compose-spec/compose-go/v2/cli"
 	composelib "github.com/compose-spec/compose-go/v2/types"
 	"github.com/pkg/errors"
 	cli "github.com/urfave/cli/v2"
 )
 
-func verifyCommand() *cli.Command {
+func verifyCommand(loadCompose loadComposeFunc) *cli.Command {
 	return &cli.Command{
 		Name: "verify",
 		Action: func(c *cli.Context) error {
-			o, err := composecli.NewProjectOptions([]string{}, composecli.WithDefaultConfigPath)
-			if err != nil {
-				return err
-			}
-			p, err := o.LoadProject(c.Context)
+			p, err := loadCompose(c)
 			if err != nil {
 				return err
 			}

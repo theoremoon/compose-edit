@@ -5,12 +5,11 @@ import (
 	"os"
 	"strings"
 
-	composecli "github.com/compose-spec/compose-go/v2/cli"
 	"github.com/pkg/errors"
 	cli "github.com/urfave/cli/v2"
 )
 
-func setImageCommand() *cli.Command {
+func setImageCommand(loadCompose loadComposeFunc) *cli.Command {
 	return &cli.Command{
 		Name: "set-image",
 		Flags: []cli.Flag{
@@ -23,11 +22,7 @@ func setImageCommand() *cli.Command {
 			},
 		},
 		Action: func(c *cli.Context) error {
-			o, err := composecli.NewProjectOptions([]string{}, composecli.WithDefaultConfigPath)
-			if err != nil {
-				return err
-			}
-			p, err := o.LoadProject(c.Context)
+			p, err := loadCompose(c)
 			if err != nil {
 				return err
 			}

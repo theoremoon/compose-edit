@@ -4,11 +4,10 @@ import (
 	"fmt"
 	"regexp"
 
-	composecli "github.com/compose-spec/compose-go/v2/cli"
 	cli "github.com/urfave/cli/v2"
 )
 
-func listImagesCommand() *cli.Command {
+func listImagesCommand(loadCompose loadComposeFunc) *cli.Command {
 	return &cli.Command{
 		Name: "list-images",
 		Flags: []cli.Flag{
@@ -17,11 +16,7 @@ func listImagesCommand() *cli.Command {
 			},
 		},
 		Action: func(c *cli.Context) error {
-			o, err := composecli.NewProjectOptions([]string{}, composecli.WithDefaultConfigPath)
-			if err != nil {
-				return err
-			}
-			p, err := o.LoadProject(c.Context)
+			p, err := loadCompose(c)
 			if err != nil {
 				return err
 			}
